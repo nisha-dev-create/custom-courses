@@ -12,7 +12,7 @@ export const Footer = () => {
               <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
                 <Sparkles className="w-5 h-5 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold text-foreground">CourseForge</span>
+              <span className="text-xl font-bold text-foreground">Custom Courses</span>
             </Link>
             <p className="text-sm text-muted-foreground mb-4">
               AI-powered personalized learning for everyone.
@@ -96,7 +96,7 @@ export const Footer = () => {
         </div>
 
         <div className="border-t border-border mt-8 pt-8 text-center text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} CourseForge. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Custom Courses. All rights reserved.</p>
         </div>
       </div>
     </footer>

@@ -17,10 +17,10 @@ const About = () => {
               <span className="text-sm font-medium text-foreground">Our Mission</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
-              Making Learning Personal
+              Custom Courses for Everyone
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              We believe everyone learns differently. CourseForge uses AI to create 
+              We believe everyone learns differently. Custom Courses uses AI to create 
               educational experiences that adapt to your unique way of understanding the world.
             </p>
           </div>
@@ -84,12 +84,12 @@ const About = () => {
                 structured content, while others need flexibility.
               </p>
               <p className="mb-4">
-                We built CourseForge to bridge this gap. Using advanced AI, we analyze 
+                We built Custom Courses to bridge this gap. Using advanced AI, we analyze 
                 your learning preferences, interests, and goals to create courses that 
                 truly resonate with how you think and learn.
               </p>
               <p>
-                Today, thousands of learners use CourseForge to discover knowledge in 
+                Today, thousands of learners use Custom Courses to discover knowledge in 
                 ways that feel natural to them. And we're just getting started.
               </p>
             </div>
