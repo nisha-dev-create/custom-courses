@@ -10,7 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { Loader2, Save, User as UserIcon, Upload, Camera, Link as LinkIcon, BookOpen, Brain, Heart, X } from "lucide-react";
+import { Loader2, Save, User as UserIcon, Upload, Camera, Link as LinkIcon, BookOpen, Brain, Heart, X, Globe, Lock } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ interface Profile {
   full_name: string | null;
   avatar_url: string | null;
   learning_preferences: LearningPreferences | null;
+  is_public: boolean;
 }
 
 const INTEREST_OPTIONS = [
@@ -53,6 +55,7 @@ const Profile = () => {
   const [personality, setPersonality] = useState("");
   const [goals, setGoals] = useState("");
   const [newInterest, setNewInterest] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -110,6 +113,7 @@ const Profile = () => {
         setPersonality(prefs.personality || "");
         setGoals(prefs.goals || "");
       }
+      setIsPublic(data.is_public || false);
     }
     setLoading(false);
   };
@@ -209,6 +213,7 @@ const Profile = () => {
           personality,
           goals,
         },
+        is_public: isPublic,
       })
       .eq("user_id", user.id);
 
@@ -515,6 +520,31 @@ const Profile = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
+                <div className="flex items-center gap-3">
+                  {isPublic ? (
+                    <Globe className="w-5 h-5 text-primary" />
+                  ) : (
+                    <Lock className="w-5 h-5 text-muted-foreground" />
+                  )}
+                  <div>
+                    <p className="font-medium text-sm">
+                      {isPublic ? "Public Profile" : "Private Profile"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {isPublic
+                        ? "Others can see your profile information"
+                        : "Only you can see your profile information"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={isPublic}
+                  onCheckedChange={setIsPublic}
+                  aria-label="Toggle profile visibility"
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="personality">Personality & Background</Label>
                 <Textarea
