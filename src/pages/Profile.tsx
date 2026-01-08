@@ -10,16 +10,33 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { Loader2, Save, User as UserIcon, Upload, Camera, Link as LinkIcon } from "lucide-react";
+import { Loader2, Save, User as UserIcon, Upload, Camera, Link as LinkIcon, BookOpen, Brain, Heart, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+
+interface LearningPreferences {
+  pace: string;
+  style: string;
+  interests: string[];
+  personality: string;
+  goals: string;
+}
 
 interface Profile {
   id: string;
   user_id: string;
   full_name: string | null;
   avatar_url: string | null;
-  learning_preferences: Record<string, unknown> | null;
+  learning_preferences: LearningPreferences | null;
 }
+
+const INTEREST_OPTIONS = [
+  "Technology", "Science", "Mathematics", "Arts", "Music", "History",
+  "Languages", "Business", "Health", "Psychology", "Philosophy", "Literature",
+  "Engineering", "Design", "Photography", "Cooking", "Finance", "Marketing"
+];
 
 const Profile = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -30,6 +47,12 @@ const Profile = () => {
   const [fullName, setFullName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [manualAvatarUrl, setManualAvatarUrl] = useState("");
+  const [learningPace, setLearningPace] = useState("moderate");
+  const [learningStyle, setLearningStyle] = useState("visual");
+  const [interests, setInterests] = useState<string[]>([]);
+  const [personality, setPersonality] = useState("");
+  const [goals, setGoals] = useState("");
+  const [newInterest, setNewInterest] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -74,10 +97,19 @@ const Profile = () => {
         variant: "destructive",
       });
     } else if (data) {
-      setProfile(data as Profile);
+      setProfile(data as unknown as Profile);
       setFullName(data.full_name || "");
       setAvatarUrl(data.avatar_url || "");
       setManualAvatarUrl(data.avatar_url || "");
+      
+      const prefs = data.learning_preferences as unknown as LearningPreferences | null;
+      if (prefs) {
+        setLearningPace(prefs.pace || "moderate");
+        setLearningStyle(prefs.style || "visual");
+        setInterests(prefs.interests || []);
+        setPersonality(prefs.personality || "");
+        setGoals(prefs.goals || "");
+      }
     }
     setLoading(false);
   };
@@ -86,7 +118,6 @@ const Profile = () => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       toast({
         title: "Invalid file type",
@@ -96,7 +127,6 @@ const Profile = () => {
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "File too large",
@@ -112,19 +142,16 @@ const Profile = () => {
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/avatar.${fileExt}`;
 
-      // Upload file to storage
       const { error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from("avatars")
         .getPublicUrl(fileName);
 
-      // Add cache buster to force refresh
       const urlWithCacheBuster = `${publicUrl}?t=${Date.now()}`;
       setAvatarUrl(urlWithCacheBuster);
       setManualAvatarUrl(urlWithCacheBuster);
@@ -155,6 +182,17 @@ const Profile = () => {
     });
   };
 
+  const addInterest = (interest: string) => {
+    if (interest && !interests.includes(interest)) {
+      setInterests([...interests, interest]);
+    }
+    setNewInterest("");
+  };
+
+  const removeInterest = (interest: string) => {
+    setInterests(interests.filter(i => i !== interest));
+  };
+
   const handleSave = async () => {
     if (!user) return;
 
@@ -164,6 +202,13 @@ const Profile = () => {
       .update({
         full_name: fullName,
         avatar_url: avatarUrl,
+        learning_preferences: {
+          pace: learningPace,
+          style: learningStyle,
+          interests,
+          personality,
+          goals,
+        },
       })
       .eq("user_id", user.id);
 
@@ -204,7 +249,8 @@ const Profile = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-2xl">
+        <div className="container mx-auto px-4 max-w-2xl space-y-6">
+          {/* Profile Card */}
           <Card>
             <CardHeader className="text-center">
               <div className="flex justify-center mb-4">
@@ -329,15 +375,170 @@ const Profile = () => {
                   </TabsContent>
                 </Tabs>
               </div>
+            </CardContent>
+          </Card>
 
-              <div className="flex gap-3 pt-4">
+          {/* Learning Preferences Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5" />
+                Learning Preferences
+              </CardTitle>
+              <CardDescription>
+                Customize how you like to learn
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="learningPace">Learning Pace</Label>
+                  <Select value={learningPace} onValueChange={setLearningPace}>
+                    <SelectTrigger id="learningPace">
+                      <SelectValue placeholder="Select pace" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="slow">Slow & Thorough</SelectItem>
+                      <SelectItem value="moderate">Moderate</SelectItem>
+                      <SelectItem value="fast">Fast-paced</SelectItem>
+                      <SelectItem value="intensive">Intensive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="learningStyle">Learning Style</Label>
+                  <Select value={learningStyle} onValueChange={setLearningStyle}>
+                    <SelectTrigger id="learningStyle">
+                      <SelectValue placeholder="Select style" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="visual">Visual (videos, diagrams)</SelectItem>
+                      <SelectItem value="reading">Reading/Writing</SelectItem>
+                      <SelectItem value="auditory">Auditory (podcasts, lectures)</SelectItem>
+                      <SelectItem value="kinesthetic">Hands-on Practice</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Learning Goals</Label>
+                <Textarea
+                  value={goals}
+                  onChange={(e) => setGoals(e.target.value)}
+                  placeholder="What do you want to achieve with your learning? (e.g., career change, skill improvement, personal growth)"
+                  rows={3}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Interests Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Heart className="w-5 h-5" />
+                Interests
+              </CardTitle>
+              <CardDescription>
+                Topics you're interested in learning about
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {interests.map((interest) => (
+                  <Badge key={interest} variant="secondary" className="pl-3 pr-1 py-1">
+                    {interest}
+                    <button
+                      onClick={() => removeInterest(interest)}
+                      className="ml-1 p-0.5 hover:bg-muted rounded"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Add Interest</Label>
+                <div className="flex gap-2">
+                  <Select value={newInterest} onValueChange={(v) => { addInterest(v); }}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select an interest" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INTEREST_OPTIONS.filter(i => !interests.includes(i)).map((interest) => (
+                        <SelectItem key={interest} value={interest}>
+                          {interest}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Or type a custom interest:
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    value={newInterest}
+                    onChange={(e) => setNewInterest(e.target.value)}
+                    placeholder="Enter custom interest"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addInterest(newInterest);
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => addInterest(newInterest)}
+                    disabled={!newInterest}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Personality Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="w-5 h-5" />
+                About You
+              </CardTitle>
+              <CardDescription>
+                Tell us about yourself to personalize your experience
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="personality">Personality & Background</Label>
+                <Textarea
+                  id="personality"
+                  value={personality}
+                  onChange={(e) => setPersonality(e.target.value)}
+                  placeholder="Share a bit about yourself, your background, learning experiences, or anything that helps us understand how you like to learn (e.g., I'm a visual learner who works best with examples, I have a background in engineering...)"
+                  rows={4}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Save Button */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex gap-3">
                 <Button onClick={handleSave} disabled={saving} className="flex-1">
                   {saving ? (
                     <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   ) : (
                     <Save className="w-4 h-4 mr-2" />
                   )}
-                  Save Changes
+                  Save All Changes
                 </Button>
                 <Button variant="outline" onClick={handleSignOut}>
                   Sign Out
