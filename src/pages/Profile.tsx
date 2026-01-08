@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -10,7 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { Loader2, Save, User as UserIcon } from "lucide-react";
+import { Loader2, Save, User as UserIcon, Upload, Camera, Link as LinkIcon } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Profile {
   id: string;
@@ -25,8 +26,11 @@ const Profile = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [fullName, setFullName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [manualAvatarUrl, setManualAvatarUrl] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -73,8 +77,82 @@ const Profile = () => {
       setProfile(data as Profile);
       setFullName(data.full_name || "");
       setAvatarUrl(data.avatar_url || "");
+      setManualAvatarUrl(data.avatar_url || "");
     }
     setLoading(false);
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an image file (JPG, PNG, GIF, etc.)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please upload an image smaller than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${user.id}/avatar.${fileExt}`;
+
+      // Upload file to storage
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(fileName);
+
+      // Add cache buster to force refresh
+      const urlWithCacheBuster = `${publicUrl}?t=${Date.now()}`;
+      setAvatarUrl(urlWithCacheBuster);
+      setManualAvatarUrl(urlWithCacheBuster);
+
+      toast({
+        title: "Avatar uploaded",
+        description: "Your avatar has been uploaded. Click Save Changes to apply.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+
+    setUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleApplyManualUrl = () => {
+    setAvatarUrl(manualAvatarUrl);
+    toast({
+      title: "Avatar URL applied",
+      description: "Click Save Changes to apply this avatar.",
+    });
   };
 
   const handleSave = async () => {
@@ -130,12 +208,32 @@ const Profile = () => {
           <Card>
             <CardHeader className="text-center">
               <div className="flex justify-center mb-4">
-                <Avatar className="w-24 h-24">
-                  <AvatarImage src={avatarUrl} alt={fullName} />
-                  <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
-                    {getInitials(fullName)}
-                  </AvatarFallback>
-                </Avatar>
+                <div className="relative">
+                  <Avatar className="w-24 h-24">
+                    <AvatarImage src={avatarUrl} alt={fullName} />
+                    <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
+                      {getInitials(fullName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 p-1.5 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Camera className="w-4 h-4" />
+                    )}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                </div>
               </div>
               <CardTitle className="flex items-center justify-center gap-2">
                 <UserIcon className="w-5 h-5" />
@@ -166,16 +264,72 @@ const Profile = () => {
                   placeholder="Enter your full name"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="avatarUrl">Avatar URL</Label>
-                <Input
-                  id="avatarUrl"
-                  type="url"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                  placeholder="https://example.com/avatar.jpg"
-                />
+
+              {/* Avatar Upload Section */}
+              <div className="space-y-3">
+                <Label>Profile Picture</Label>
+                <Tabs defaultValue="upload" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="upload" className="flex items-center gap-2">
+                      <Upload className="w-4 h-4" />
+                      Upload Image
+                    </TabsTrigger>
+                    <TabsTrigger value="url" className="flex items-center gap-2">
+                      <LinkIcon className="w-4 h-4" />
+                      Image URL
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="upload" className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="flex-1"
+                      >
+                        {uploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Choose Image
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Supported formats: JPG, PNG, GIF, WebP. Max size: 5MB
+                    </p>
+                  </TabsContent>
+                  <TabsContent value="url" className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="url"
+                        value={manualAvatarUrl}
+                        onChange={(e) => setManualAvatarUrl(e.target.value)}
+                        placeholder="https://example.com/avatar.jpg"
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleApplyManualUrl}
+                        disabled={!manualAvatarUrl}
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Enter a direct link to an image
+                    </p>
+                  </TabsContent>
+                </Tabs>
               </div>
+
               <div className="flex gap-3 pt-4">
                 <Button onClick={handleSave} disabled={saving} className="flex-1">
                   {saving ? (
