@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { Loader2, Save, User as UserIcon, Upload, Camera, Link as LinkIcon, BookOpen, Brain, Heart, X, Globe, Lock, Key } from "lucide-react";
+import { Loader2, Save, User as UserIcon, Upload, Camera, Link as LinkIcon, BookOpen, Brain, Heart, X, Globe, Lock, Key, Mail } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -59,6 +59,8 @@ const Profile = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [changingEmail, setChangingEmail] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -282,10 +284,49 @@ const Profile = () => {
         title: "Password changed",
         description: "Your password has been updated successfully.",
       });
-      setNewPassword("");
+    setNewPassword("");
       setConfirmPassword("");
     }
     setChangingPassword(false);
+  };
+
+  const handleChangeEmail = async () => {
+    if (!newEmail) {
+      toast({
+        title: "Missing email",
+        description: "Please enter your new email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+      toast({
+        title: "Invalid email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setChangingEmail(true);
+    const { error } = await supabase.auth.updateUser({ email: newEmail });
+
+    if (error) {
+      toast({
+        title: "Error changing email",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Confirmation sent",
+        description: "Please check both your old and new email addresses to confirm the change.",
+      });
+      setNewEmail("");
+    }
+    setChangingEmail(false);
   };
 
   const getInitials = (name: string | null) => {
@@ -653,6 +694,57 @@ const Profile = () => {
                   <Key className="w-4 h-4 mr-2" />
                 )}
                 Change Password
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Change Email Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="w-5 h-5" />
+                Change Email
+              </CardTitle>
+              <CardDescription>
+                Update your email address
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="currentEmail">Current Email</Label>
+                <Input
+                  id="currentEmail"
+                  type="email"
+                  value={user?.email || ""}
+                  disabled
+                  className="bg-muted"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newEmail">New Email</Label>
+                <Input
+                  id="newEmail"
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="Enter new email address"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                A confirmation link will be sent to both your current and new email addresses.
+              </p>
+              <Button
+                onClick={handleChangeEmail}
+                disabled={changingEmail || !newEmail}
+                variant="outline"
+                className="w-full"
+              >
+                {changingEmail ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Mail className="w-4 h-4 mr-2" />
+                )}
+                Change Email
               </Button>
             </CardContent>
           </Card>
