@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Loader2, ArrowRight, X } from "lucide-react";
-
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { User } from "@supabase/supabase-js";
 const personalityTraits = [
   "Visual Learner",
   "Analytical",
@@ -39,14 +41,26 @@ const interests = [
 
 const CreateCourse = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [user, setUser] = useState<User | null>(null);
   const [step, setStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedCourseId, setGeneratedCourseId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     topic: "",
     goals: "",
     selectedTraits: [] as string[],
     selectedInterests: [] as string[],
   });
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (!session?.user) {
+        navigate("/auth");
+      }
+    });
+  }, [navigate]);
 
   const toggleTrait = (trait: string) => {
     setFormData((prev) => ({
@@ -67,11 +81,67 @@ const CreateCourse = () => {
   };
 
   const handleGenerate = async () => {
+    if (!user) {
+      toast({ title: "Please sign in to create a course", variant: "destructive" });
+      return;
+    }
+
     setIsGenerating(true);
-    // Simulate AI generation
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    setIsGenerating(false);
-    setStep(3);
+    try {
+      // Create course in database
+      const { data: course, error } = await supabase
+        .from("courses")
+        .insert({
+          title: `${formData.topic} Mastery Course`,
+          description: formData.goals,
+          category: formData.selectedInterests[0] || "General",
+          modules: 6,
+          duration: "12 hours",
+          created_by: user.id,
+          is_public: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setGeneratedCourseId(course.id);
+      setStep(3);
+    } catch (error: any) {
+      toast({
+        title: "Error creating course",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleStartLearning = async () => {
+    if (!user || !generatedCourseId) return;
+
+    try {
+      // Add to user_courses with "current" status
+      const { error } = await supabase
+        .from("user_courses")
+        .insert({
+          user_id: user.id,
+          course_id: generatedCourseId,
+          status: "current",
+          progress: 0,
+        });
+
+      if (error) throw error;
+
+      navigate(`/course/${generatedCourseId}`);
+    } catch (error: any) {
+      toast({
+        title: "Error starting course",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -317,7 +387,7 @@ const CreateCourse = () => {
                   <Button variant="outline" size="lg" onClick={() => setStep(1)} className="flex-1">
                     Create Another
                   </Button>
-                  <Button size="lg" className="flex-1 gap-2" onClick={() => navigate("/course/new")}>
+                  <Button size="lg" className="flex-1 gap-2" onClick={handleStartLearning}>
                     <Sparkles className="w-4 h-4" />
                     Start Learning
                   </Button>

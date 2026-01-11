@@ -103,8 +103,11 @@ const Library = () => {
     setLoading(false);
   };
 
-  const CourseCard = ({ course, progress }: { course: Course; progress?: number }) => (
-    <Card className="hover:shadow-lg transition-shadow">
+  const CourseCard = ({ course, progress, courseId }: { course: Course; progress?: number; courseId?: string }) => (
+    <Card 
+      className="hover:shadow-lg transition-shadow cursor-pointer"
+      onClick={() => navigate(`/course/${courseId || course.id}`)}
+    >
       <div className="aspect-video bg-muted rounded-t-lg overflow-hidden">
         {course.image_url ? (
           <img src={course.image_url} alt={course.title} className="w-full h-full object-cover" />
@@ -229,7 +232,7 @@ const Library = () => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {currentCourses.map(uc => (
-                    <CourseCard key={uc.id} course={uc.course} progress={uc.progress} />
+                    <CourseCard key={uc.id} course={uc.course} progress={uc.progress} courseId={uc.course.id} />
                   ))}
                 </div>
               )}
@@ -245,7 +248,7 @@ const Library = () => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {completedCourses.map(uc => (
-                    <CourseCard key={uc.id} course={uc.course} progress={100} />
+                    <CourseCard key={uc.id} course={uc.course} progress={100} courseId={uc.course.id} />
                   ))}
                 </div>
               )}
@@ -261,7 +264,7 @@ const Library = () => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {likedCourses.map(uc => (
-                    <CourseCard key={uc.id} course={uc.course} />
+                    <CourseCard key={uc.id} course={uc.course} courseId={uc.course.id} />
                   ))}
                 </div>
               )}
@@ -277,7 +280,7 @@ const Library = () => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {sharedCourses.map(uc => (
-                    <CourseCard key={uc.id} course={uc.course} />
+                    <CourseCard key={uc.id} course={uc.course} courseId={uc.course.id} />
                   ))}
                 </div>
               )}

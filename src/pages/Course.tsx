@@ -1,10 +1,30 @@
+import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useParams, useNavigate } from "react-router-dom";
-import { Play, CheckCircle, Clock, BookOpen, ArrowLeft } from "lucide-react";
+import { Play, CheckCircle, Clock, ArrowLeft, Heart, Share2, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { User } from "@supabase/supabase-js";
+
+interface Course {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  duration: string | null;
+  modules: number | null;
+  created_by: string | null;
+}
+
+interface UserCourse {
+  id: string;
+  status: string;
+  progress: number | null;
+}
 
 const courseModules = [
   {
@@ -48,13 +68,133 @@ const courseModules = [
 const Course = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+  const { toast } = useToast();
+  const [user, setUser] = useState<User | null>(null);
+  const [course, setCourse] = useState<Course | null>(null);
+  const [userCourse, setUserCourse] = useState<UserCourse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (id && id !== "new") {
+      fetchCourse();
+    } else {
+      setLoading(false);
+    }
+  }, [id, user]);
+
+  const fetchCourse = async () => {
+    try {
+      const { data: courseData, error: courseError } = await supabase
+        .from("courses")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (courseError) throw courseError;
+      setCourse(courseData);
+
+      if (user) {
+        const { data: userCourseData } = await supabase
+          .from("user_courses")
+          .select("*")
+          .eq("course_id", id)
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        setUserCourse(userCourseData);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error loading course",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!user || !id) {
+      toast({ title: "Please sign in", variant: "destructive" });
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      if (userCourse) {
+        // Update existing user_course
+        const { error } = await supabase
+          .from("user_courses")
+          .update({ status: newStatus })
+          .eq("id", userCourse.id);
+
+        if (error) throw error;
+        setUserCourse({ ...userCourse, status: newStatus });
+      } else {
+        // Create new user_course
+        const { data, error } = await supabase
+          .from("user_courses")
+          .insert({
+            user_id: user.id,
+            course_id: id,
+            status: newStatus,
+            progress: newStatus === "completed" ? 100 : 0,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        setUserCourse(data);
+      }
+
+      toast({
+        title: `Course ${newStatus === "liked" ? "liked" : newStatus === "completed" ? "marked as completed" : newStatus === "shared" ? "shared" : "updated"}!`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error updating course",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const totalLessons = courseModules.reduce((acc, m) => acc + m.lessons.length, 0);
   const completedLessons = courseModules.reduce(
     (acc, m) => acc + m.lessons.filter((l) => l.completed).length,
     0
   );
-  const progress = Math.round((completedLessons / totalLessons) * 100);
+  const progress = userCourse?.progress ?? Math.round((completedLessons / totalLessons) * 100);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const getStatusBadge = () => {
+    if (!userCourse) return null;
+    const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
+      current: { label: "In Progress", variant: "default" },
+      completed: { label: "Completed", variant: "secondary" },
+      liked: { label: "Liked", variant: "outline" },
+      shared: { label: "Shared", variant: "outline" },
+    };
+    const status = statusMap[userCourse.status];
+    return status ? <Badge variant={status.variant}>{status.label}</Badge> : null;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -73,15 +213,49 @@ const Course = () => {
 
           {/* Course Header */}
           <div className="mb-8">
-            <Badge variant="secondary" className="mb-4">
-              In Progress
-            </Badge>
+            <div className="flex items-center gap-2 mb-4">
+              {getStatusBadge()}
+            </div>
             <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Your Personalized Mastery Course
+              {course?.title || "Your Personalized Mastery Course"}
             </h1>
             <p className="text-lg text-muted-foreground mb-6">
-              A personalized learning path designed just for you.
+              {course?.description || "A personalized learning path designed just for you."}
             </p>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-3 mb-6">
+              <Button
+                variant={userCourse?.status === "liked" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleStatusChange("liked")}
+                disabled={actionLoading}
+                className="gap-2"
+              >
+                <Heart className={`w-4 h-4 ${userCourse?.status === "liked" ? "fill-current" : ""}`} />
+                {userCourse?.status === "liked" ? "Liked" : "Like"}
+              </Button>
+              <Button
+                variant={userCourse?.status === "completed" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleStatusChange("completed")}
+                disabled={actionLoading}
+                className="gap-2"
+              >
+                <CheckCircle className="w-4 h-4" />
+                {userCourse?.status === "completed" ? "Completed" : "Mark Complete"}
+              </Button>
+              <Button
+                variant={userCourse?.status === "shared" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleStatusChange("shared")}
+                disabled={actionLoading}
+                className="gap-2"
+              >
+                <Share2 className="w-4 h-4" />
+                {userCourse?.status === "shared" ? "Shared" : "Share"}
+              </Button>
+            </div>
             
             {/* Progress */}
             <div className="bg-card p-6 rounded-xl border border-border">
