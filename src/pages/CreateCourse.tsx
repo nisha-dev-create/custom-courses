@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ const interests = [
 ];
 
 const CreateCourse = () => {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
   const [formData, setFormData] = useState({
@@ -315,7 +317,7 @@ const CreateCourse = () => {
                   <Button variant="outline" size="lg" onClick={() => setStep(1)} className="flex-1">
                     Create Another
                   </Button>
-                  <Button size="lg" className="flex-1 gap-2">
+                  <Button size="lg" className="flex-1 gap-2" onClick={() => navigate("/course/new")}>
                     <Sparkles className="w-4 h-4" />
                     Start Learning
                   </Button>
