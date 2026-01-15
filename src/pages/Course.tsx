@@ -9,6 +9,7 @@ import { Play, CheckCircle, Clock, ArrowLeft, Heart, Share2, Loader2 } from "luc
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { User } from "@supabase/supabase-js";
+import { ShareDialog } from "@/components/ShareDialog";
 
 interface Course {
   id: string;
@@ -77,6 +78,7 @@ const Course = () => {
   const [userCourse, setUserCourse] = useState<UserCourse | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -277,7 +279,7 @@ const Course = () => {
               <Button
                 variant={userCourse?.is_shared ? "default" : "outline"}
                 size="sm"
-                onClick={() => handleToggleStatus("is_shared")}
+                onClick={() => setShareDialogOpen(true)}
                 disabled={actionLoading}
                 className="gap-2"
               >
@@ -285,6 +287,20 @@ const Course = () => {
                 {userCourse?.is_shared ? "Shared" : "Share"}
               </Button>
             </div>
+
+            {/* Share Dialog */}
+            <ShareDialog
+              open={shareDialogOpen}
+              onOpenChange={setShareDialogOpen}
+              courseTitle={course?.title || "Course"}
+              courseId={id || ""}
+              isShared={userCourse?.is_shared || false}
+              onShareSettingChange={(isPublic) => {
+                if (isPublic !== (userCourse?.is_shared || false)) {
+                  handleToggleStatus("is_shared");
+                }
+              }}
+            />
             
             {/* Progress */}
             <div className="bg-card p-6 rounded-xl border border-border">
