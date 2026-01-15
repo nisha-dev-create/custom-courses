@@ -94,6 +94,9 @@ export type Database = {
           course_id: string
           created_at: string
           id: string
+          is_completed: boolean
+          is_liked: boolean
+          is_shared: boolean
           progress: number | null
           status: string
           updated_at: string
@@ -103,6 +106,9 @@ export type Database = {
           course_id: string
           created_at?: string
           id?: string
+          is_completed?: boolean
+          is_liked?: boolean
+          is_shared?: boolean
           progress?: number | null
           status: string
           updated_at?: string
@@ -112,6 +118,9 @@ export type Database = {
           course_id?: string
           created_at?: string
           id?: string
+          is_completed?: boolean
+          is_liked?: boolean
+          is_shared?: boolean
           progress?: number | null
           status?: string
           updated_at?: string

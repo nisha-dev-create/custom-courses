@@ -24,6 +24,9 @@ interface UserCourse {
   id: string;
   status: string;
   progress: number;
+  is_liked: boolean;
+  is_shared: boolean;
+  is_completed: boolean;
   course: Course;
 }
 
@@ -81,16 +84,19 @@ const Library = () => {
           id,
           status,
           progress,
+          is_liked,
+          is_shared,
+          is_completed,
           course:courses(*)
         `)
         .eq("user_id", user.id);
 
       if (userCourses) {
         const coursesWithDetails = userCourses.filter(uc => uc.course) as UserCourse[];
-        setCurrentCourses(coursesWithDetails.filter(uc => uc.status === "current"));
-        setCompletedCourses(coursesWithDetails.filter(uc => uc.status === "completed"));
-        setLikedCourses(coursesWithDetails.filter(uc => uc.status === "liked"));
-        setSharedCourses(coursesWithDetails.filter(uc => uc.status === "shared"));
+        setCurrentCourses(coursesWithDetails.filter(uc => uc.status === "current" && !uc.is_completed));
+        setCompletedCourses(coursesWithDetails.filter(uc => uc.is_completed));
+        setLikedCourses(coursesWithDetails.filter(uc => uc.is_liked));
+        setSharedCourses(coursesWithDetails.filter(uc => uc.is_shared));
       }
     } catch (error: any) {
       toast({
