@@ -24,6 +24,9 @@ interface UserCourse {
   id: string;
   status: string;
   progress: number | null;
+  is_liked: boolean;
+  is_shared: boolean;
+  is_completed: boolean;
 }
 
 const courseModules = [
@@ -121,7 +124,7 @@ const Course = () => {
     }
   };
 
-  const handleStatusChange = async (newStatus: string) => {
+  const handleToggleStatus = async (field: 'is_liked' | 'is_shared' | 'is_completed') => {
     if (!user || !id) {
       toast({ title: "Please sign in", variant: "destructive" });
       return;
@@ -130,24 +133,41 @@ const Course = () => {
     setActionLoading(true);
     try {
       if (userCourse) {
-        // Update existing user_course
+        // Toggle the field
+        const newValue = !userCourse[field];
+        const updateData: Record<string, boolean | number> = { [field]: newValue };
+        
+        // If marking as completed, also set progress to 100
+        if (field === 'is_completed' && newValue) {
+          updateData.progress = 100;
+        }
+
         const { error } = await supabase
           .from("user_courses")
-          .update({ status: newStatus })
+          .update(updateData)
           .eq("id", userCourse.id);
 
         if (error) throw error;
-        setUserCourse({ ...userCourse, status: newStatus });
+        setUserCourse({ 
+          ...userCourse, 
+          [field]: newValue,
+          ...(field === 'is_completed' && newValue ? { progress: 100 } : {})
+        });
       } else {
-        // Create new user_course
+        // Create new user_course with the toggled field
+        const newCourse = {
+          user_id: user.id,
+          course_id: id,
+          status: "current",
+          progress: field === 'is_completed' ? 100 : 0,
+          is_liked: field === 'is_liked',
+          is_shared: field === 'is_shared',
+          is_completed: field === 'is_completed',
+        };
+
         const { data, error } = await supabase
           .from("user_courses")
-          .insert({
-            user_id: user.id,
-            course_id: id,
-            status: newStatus,
-            progress: newStatus === "completed" ? 100 : 0,
-          })
+          .insert(newCourse)
           .select()
           .single();
 
@@ -155,9 +175,12 @@ const Course = () => {
         setUserCourse(data);
       }
 
-      toast({
-        title: `Course ${newStatus === "liked" ? "liked" : newStatus === "completed" ? "marked as completed" : newStatus === "shared" ? "shared" : "updated"}!`,
-      });
+      const labels = {
+        is_liked: userCourse?.[field] ? "Removed from liked" : "Added to liked",
+        is_shared: userCourse?.[field] ? "Unshared" : "Shared",
+        is_completed: userCourse?.[field] ? "Marked as incomplete" : "Marked as completed",
+      };
+      toast({ title: labels[field] });
     } catch (error: any) {
       toast({
         title: "Error updating course",
@@ -184,16 +207,22 @@ const Course = () => {
     );
   }
 
-  const getStatusBadge = () => {
+  const getStatusBadges = () => {
     if (!userCourse) return null;
-    const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
-      current: { label: "In Progress", variant: "default" },
-      completed: { label: "Completed", variant: "secondary" },
-      liked: { label: "Liked", variant: "outline" },
-      shared: { label: "Shared", variant: "outline" },
-    };
-    const status = statusMap[userCourse.status];
-    return status ? <Badge variant={status.variant}>{status.label}</Badge> : null;
+    const badges = [];
+    if (userCourse.status === "current") {
+      badges.push(<Badge key="progress" variant="default">In Progress</Badge>);
+    }
+    if (userCourse.is_completed) {
+      badges.push(<Badge key="completed" variant="secondary">Completed</Badge>);
+    }
+    if (userCourse.is_liked) {
+      badges.push(<Badge key="liked" variant="outline">Liked</Badge>);
+    }
+    if (userCourse.is_shared) {
+      badges.push(<Badge key="shared" variant="outline">Shared</Badge>);
+    }
+    return badges.length > 0 ? badges : null;
   };
 
   return (
@@ -213,8 +242,8 @@ const Course = () => {
 
           {/* Course Header */}
           <div className="mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              {getStatusBadge()}
+            <div className="flex items-center gap-2 flex-wrap mb-4">
+              {getStatusBadges()}
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
               {course?.title || "Your Personalized Mastery Course"}
@@ -226,34 +255,34 @@ const Course = () => {
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-3 mb-6">
               <Button
-                variant={userCourse?.status === "liked" ? "default" : "outline"}
+                variant={userCourse?.is_liked ? "default" : "outline"}
                 size="sm"
-                onClick={() => handleStatusChange("liked")}
+                onClick={() => handleToggleStatus("is_liked")}
                 disabled={actionLoading}
                 className="gap-2"
               >
-                <Heart className={`w-4 h-4 ${userCourse?.status === "liked" ? "fill-current" : ""}`} />
-                {userCourse?.status === "liked" ? "Liked" : "Like"}
+                <Heart className={`w-4 h-4 ${userCourse?.is_liked ? "fill-current" : ""}`} />
+                {userCourse?.is_liked ? "Liked" : "Like"}
               </Button>
               <Button
-                variant={userCourse?.status === "completed" ? "default" : "outline"}
+                variant={userCourse?.is_completed ? "default" : "outline"}
                 size="sm"
-                onClick={() => handleStatusChange("completed")}
+                onClick={() => handleToggleStatus("is_completed")}
                 disabled={actionLoading}
                 className="gap-2"
               >
-                <CheckCircle className="w-4 h-4" />
-                {userCourse?.status === "completed" ? "Completed" : "Mark Complete"}
+                <CheckCircle className={`w-4 h-4 ${userCourse?.is_completed ? "fill-current" : ""}`} />
+                {userCourse?.is_completed ? "Completed" : "Mark Complete"}
               </Button>
               <Button
-                variant={userCourse?.status === "shared" ? "default" : "outline"}
+                variant={userCourse?.is_shared ? "default" : "outline"}
                 size="sm"
-                onClick={() => handleStatusChange("shared")}
+                onClick={() => handleToggleStatus("is_shared")}
                 disabled={actionLoading}
                 className="gap-2"
               >
                 <Share2 className="w-4 h-4" />
-                {userCourse?.status === "shared" ? "Shared" : "Share"}
+                {userCourse?.is_shared ? "Shared" : "Share"}
               </Button>
             </div>
             
